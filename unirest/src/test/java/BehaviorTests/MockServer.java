@@ -26,18 +26,16 @@
 
 package BehaviorTests;
 
-import kong.unirest.Headers;
+import kong.unirest.JacksonObjectMapper;
+import kong.unirest.TestUtil;
 import spark.Request;
 import spark.Response;
 import spark.Spark;
 import spark.utils.IOUtils;
-import kong.unirest.JacksonObjectMapper;
-import kong.unirest.TestUtil;
 
 import javax.servlet.ServletOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.InputStream;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -51,7 +49,8 @@ public class MockServer {
 	private static int onPage = 1;
 	private static final List<Pair<String,String>> responseHeaders = new ArrayList<>();
 	private static final List<Pair<String,String>> cookies = new ArrayList<>();
-
+	private static int retryTimes = 0;
+	private static int retryStatus = 429;
 	private static final JacksonObjectMapper om = new JacksonObjectMapper();
 	private static Object responseBody;
 	public static final int PORT = 4567;
@@ -217,6 +216,13 @@ public class MockServer {
 	}
 
 	private static Object jsonResponse(Request req, Response res) {
+		if(retryTimes > 0){
+			res.header("Retry-After", "1");
+			retryTimes--;
+			Spark.halt(retryStatus);
+			return null;
+		}
+
 		return simpleResponse(req, res)
 				.orElseGet(() -> {
 					RequestCapture value = getRequestCapture(req, res);
@@ -252,5 +258,10 @@ public class MockServer {
 
 	public static void expectCookie(String name, String value) {
 		cookies.add(new Pair<>(name, value));
+	}
+
+	public static void retryTimes(int numberOfTimeToFail, int status) {
+		retryTimes = numberOfTimeToFail;
+		retryStatus = status;
 	}
 }

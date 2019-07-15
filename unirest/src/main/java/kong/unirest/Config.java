@@ -78,6 +78,7 @@ public class Config {
     private String cookieSpec;
     private UniMetric metrics = new NoopMetric();
     private long ttl = -1;
+    private boolean retry = false;
 
     public Config() {
         setDefaults();
@@ -98,6 +99,7 @@ public class Config {
         verifySsl = true;
         keystore = null;
         keystorePassword = null;
+        retry = false;
         try {
             asyncBuilder = ApacheAsyncClient::new;
             clientBuilder = ApacheClient::new;
@@ -429,6 +431,18 @@ public class Config {
     }
 
     /**
+     * Automaticly retry on 429/529 responses with the Retry-After response header
+     * Default is false
+     *
+     * @param value a bool is its true or not.
+     * @return this config object
+     */
+    public Config automaticRetryAfter(boolean value) {
+        this.retry = value;
+        return this;
+    }
+
+    /**
      * Automaticly retry certain recoverable errors like socket timeouts. Up to 4 times
      * Note that currently this only works on synchronous calls.
      * Default is true
@@ -730,5 +744,7 @@ public class Config {
         return ttl;
     }
 
-
+    public boolean isAutomaticRetryAfter(){
+        return retry;
+    }
 }

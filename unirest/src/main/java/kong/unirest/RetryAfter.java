@@ -23,49 +23,47 @@
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package kong.unirest.apache;
+package kong.unirest;
 
-import java.util.*;
-import java.util.stream.Stream;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.util.Optional;
 
-class Util {
-    static <T, M extends T> Optional<M> tryCast(T original, Class<M> too) {
-        if (original != null && too.isAssignableFrom(original.getClass())) {
-            return Optional.of((M) original);
-        }
-        return Optional.empty();
+class RetryAfter {
+    private static DateTimeFormatter formatter = new DateTimeFormatterBuilder()
+            .append(DateTimeFormatter.ISO_DATE)
+            .appendPattern("XX")
+            .toFormatter();
+    private int millies;
+
+    public RetryAfter(int seconds) {
+        this.millies = seconds * 1000;
     }
 
-    static Stream<Exception> collectExceptions(Optional<Exception>... ex) {
-        return Stream.of(ex).flatMap(Util::stream);
+    public static RetryAfter parse(Headers response) {
+        String value = response.getFirst("Retry-After");
+        return tryAsInt(value)
+                .orElse(tryAsDateTime(value));
     }
 
-    //In Java 9 this has been added as Optional::stream. Remove this whenever we get there.
-    static <T> Stream<T> stream(Optional<T> opt) {
-        return opt.map(Stream::of).orElseGet(Stream::empty);
+    private static RetryAfter tryAsDateTime(String value) {
+        return new RetryAfter(1);
     }
 
-    static <T> Optional<Exception> tryDo(T c, ExConsumer<T> consumer) {
-        try {
-            if (Objects.nonNull(c)) {
-                consumer.accept(c);
-            }
+    private static Optional<RetryAfter> tryAsInt(String s){
+        try{
+            return Optional.of(new RetryAfter(Integer.parseInt(s)));
+        }catch (NumberFormatException e){
             return Optional.empty();
-        } catch (Exception e) {
-            return Optional.of(e);
         }
     }
 
-    public static <T> Set<T> newSet(T... tees) {
-        return new HashSet<>(Arrays.asList(tees));
-    }
 
-    @FunctionalInterface
-    public interface ExConsumer<T>{
-        void accept(T t) throws Exception;
-    }
-
-    static boolean isNullOrEmpty(String s) {
-        return s == null || s.trim().isEmpty();
+    public void waitForIt() {
+        try {
+            Thread.currentThread().sleep(millies);
+        } catch (InterruptedException e) {
+            throw new UnirestException(e);
+        }
     }
 }
